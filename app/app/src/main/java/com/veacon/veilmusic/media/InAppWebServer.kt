@@ -597,6 +597,17 @@ function refresh(){
     if(el)el.innerHTML=logs.reverse().slice(0,100).map(l=>{const c=l.includes('✓')?'g':l.includes('✗')?'r':'d';return'<div class='+c+'>'+l.replace(/</g,'&lt;')+'</div>';}).join('')||'<div class=d>暂无请求。</div>';
   });
 }
+// 保存令牌后表单跳回 /?token=…，这里回显结果。脚本在 head 里，等 DOM 就绪再查节点。
+document.addEventListener('DOMContentLoaded',function(){
+  const state=new URLSearchParams(location.search).get('token');
+  if(!state)return;
+  const el=document.getElementById('token-result');
+  if(!el)return;
+  el.textContent = state==='saved' ? '令牌已保存并通过校验'
+    : state==='invalid' ? '令牌无效，请重新获取后再试'
+    : '暂时无法校验（可能离线），已保留原令牌';
+  if(state!=='saved') el.style.color='#fa233b';
+});
 setInterval(refresh,3000);
 function copyLogs(id){
   fetch(id==='applogs'?'/logs':'/netlogs').then(r=>r.json()).then(logs=>{
@@ -626,6 +637,19 @@ function legacyCopy(text,done,b){
 <header class="brand-row"><p class="brand">AMusic</p><a class="language-switch" href="?lang=${if (language == "zh") "en" else "zh"}" lang="${if (language == "zh") "en" else "zh"}" aria-label="${if (language == "zh") "Switch to English" else "切换为中文"}"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true"><path d="M3 6h13m0 0-3-3m3 3-3 3M17 14H4m0 0 3-3m-3 3 3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${if (language == "zh") "English" else "中文"}</span></a></header>
 <h1>电视端配置</h1>
 <p class=sub>在手机浏览器里导入歌单、调整播放设置与音源，改动即时同步到电视。</p>
+<div class=card>
+<h2>Apple Music 登录</h2>
+<p class=sub style=margin-bottom:10px>电视端「登录 Apple Music」扫的就是这个页面。在 iPhone 上获取 Music-User-Token 后粘贴到下面；保存成功电视会立即同步，无需重启。</p>
+<form method=POST action=/set-token>
+<label class=token-label for=mut>Music-User-Token</label>
+<textarea id=mut name=mut autocomplete=off autocapitalize=off spellcheck=false placeholder="粘贴以 eyJ 开头的长串令牌" style="min-height:110px"></textarea>
+<button class="btn btn-p" type=submit>保存令牌</button>
+</form>
+<form method=POST action=/clear-token style=margin-top:8px onsubmit="return confirm('确定清除已保存的令牌？')">
+<button class="btn btn-s" type=submit>清除令牌</button>
+</form>
+<p class=sub id=token-result style=margin-top:10px></p>
+</div>
 <div class=card>
 <h2>资料库 · 导入歌单</h2>
 <p class=sub style=margin-bottom:10px>粘贴 QQ 音乐 / 网易云 / 酷狗的公开歌单链接；也可以在下面粘多行「歌名 - 歌手」。导入后直接出现在电视端「资料库」。</p>
