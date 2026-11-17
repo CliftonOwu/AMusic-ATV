@@ -13,6 +13,9 @@ jobs:
       run:
         working-directory: app
     steps:
+      - name: Workflow marker
+        run: echo "workflow-rev=3 (no setup-android, sdkmanager with retries)"
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
@@ -45,10 +48,21 @@ jobs:
           echo "Using $SM"
           "$SM" --version || true
           yes | "$SM" --sdk_root="$SDK" --licenses > /dev/null || true
+          # `tools` is gone from current repositories; only the packages this
+          # project actually compiles against are installed, with retries.
+          install() {
+            for attempt in 1 2 3; do
+              if "$SM" --sdk_root="$SDK" --install "$@"; then return 0; fi
+              echo "sdkmanager attempt $attempt failed; retrying in 10s"
+              sleep 10
+            done
+            echo "::error::sdkmanager could not install $*"
+            return 1
+          }
           if [ -d "$SDK/platforms/android-36" ]; then
             echo "platforms;android-36 already present"
           else
-            "$SM" --sdk_root="$SDK" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+            install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
           fi
           echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
