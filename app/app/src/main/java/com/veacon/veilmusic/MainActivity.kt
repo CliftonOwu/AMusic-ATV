@@ -58,6 +58,11 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             windowChromePrefs.showSystemBars.collect { applyWindowChrome() }
         }
+        // Appearance edits (light / dark / follow system) recolour the bars at once.
+        lifecycleScope.launch {
+            androidx.compose.runtime.snapshotFlow { com.veacon.veilmusic.ui.theme.AppPalette.isDark }
+                .collect { applyWindowChrome() }
+        }
         setContent {
             com.veacon.veilmusic.ui.components.LargeScreenGate(onAccessChanged = ::updateWindowAccess) {
                 com.veacon.veilmusic.ui.components.StartupHost { ready ->

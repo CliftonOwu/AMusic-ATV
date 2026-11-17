@@ -106,12 +106,22 @@ fun DevMenuScreen(
             }
             LanguageSettingsSection()
             SettingsSection(tx("外观", "Appearance")) {
-                val dark = com.veacon.veilmusic.ui.theme.AppPalette.isDark
-                Stepper(tx("界面模式", "Appearance"), if (dark) tx("深色", "Dark") else tx("浅色", "Light"),
-                    tx("选择应用界面的显示模式", "Choose the app appearance"),
-                    { com.veacon.veilmusic.ui.theme.AppPalette.setDark(ctx, false) },
-                    { com.veacon.veilmusic.ui.theme.AppPalette.setDark(ctx, true) },
-                    decEnabled = dark, incEnabled = !dark)
+                // 三态：浅色 / 深色 / 跟随系统。跟随系统时副标题回显实际生效的那一侧，
+                // 否则用户看不出系统当前是深是浅。
+                val mode = com.veacon.veilmusic.ui.theme.AppPalette.mode
+                val effectiveDark = com.veacon.veilmusic.ui.theme.AppPalette.isDark
+                val modeLabel = when (mode) {
+                    com.veacon.veilmusic.ui.theme.AppearanceMode.LIGHT -> tx("浅色", "Light")
+                    com.veacon.veilmusic.ui.theme.AppearanceMode.DARK -> tx("深色", "Dark")
+                    else -> if (effectiveDark) tx("跟随系统（深色）", "Follow system (dark)")
+                            else tx("跟随系统（浅色）", "Follow system (light)")
+                }
+                Stepper(tx("界面模式", "Appearance"), modeLabel,
+                    tx("浅色 / 深色 / 跟随系统", "Light, dark, or follow the system"),
+                    { com.veacon.veilmusic.ui.theme.AppPalette.setMode(ctx, mode.previous()) },
+                    { com.veacon.veilmusic.ui.theme.AppPalette.setMode(ctx, mode.next()) },
+                    decEnabled = mode.ordinal > 0,
+                    incEnabled = mode.ordinal < com.veacon.veilmusic.ui.theme.AppearanceMode.entries.lastIndex)
                 SettingDivider()
                 // 电视没有系统栏，隐藏是合理的；手机/触摸屏上藏起来会导致
                 // 通知栏完全够不到、手势条压住首行内容，所以给一个开关。

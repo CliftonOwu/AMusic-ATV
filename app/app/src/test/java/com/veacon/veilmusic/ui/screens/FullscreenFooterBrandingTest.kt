@@ -56,7 +56,7 @@ class FullscreenFooterBrandingTest {
         assertEquals(BuildConfig.VERSION_NAME, packageInfo.versionName)
         assertEquals(BuildConfig.VERSION_CODE, packageInfo.versionCode)
         val ctx=compose.activity;val app=ctx.packageManager.getApplicationInfo(BuildConfig.APPLICATION_ID,0)
-        assertEquals("Veil Music",ctx.packageManager.getApplicationLabel(app).toString())
+        assertEquals("Apple Music",ctx.packageManager.getApplicationLabel(app).toString())
         val activity=ctx.packageManager.getActivityInfo(ComponentName(ctx,MainActivity::class.java),0)
         assertTrue(activity.exported)
         val icon=BitmapFactory.decodeResource(ctx.resources,R.mipmap.ic_launcher,BitmapFactory.Options().apply {inScaled=false})
