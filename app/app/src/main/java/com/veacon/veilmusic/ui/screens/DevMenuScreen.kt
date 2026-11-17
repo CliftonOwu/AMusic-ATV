@@ -112,6 +112,18 @@ fun DevMenuScreen(
                     { com.veacon.veilmusic.ui.theme.AppPalette.setDark(ctx, false) },
                     { com.veacon.veilmusic.ui.theme.AppPalette.setDark(ctx, true) },
                     decEnabled = dark, incEnabled = !dark)
+                SettingDivider()
+                // 电视没有系统栏，隐藏是合理的；手机/触摸屏上藏起来会导致
+                // 通知栏完全够不到、手势条压住首行内容，所以给一个开关。
+                Toggle(
+                    tx("显示状态栏和导航栏", "Show status and navigation bars"),
+                    state.showSystemBars,
+                    if (state.showSystemBars) {
+                        tx("已显示：可从顶部下拉通知栏", "Visible: pull down for notifications")
+                    } else {
+                        tx("已隐藏（全屏沉浸）：手机建议开启", "Hidden (immersive): recommended on phones")
+                    },
+                ) { vm.toggleSystemBars() }
             }
             SettingsSection(tr(R.string.playback_section)) {
                 Stepper(tr(R.string.msg_187), tr(R.string.msg_188).format(com.veacon.veilmusic.i18n.AppLanguage.locale, state.crossfadeMs / 1000f),

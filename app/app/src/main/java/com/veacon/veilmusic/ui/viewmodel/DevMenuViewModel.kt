@@ -47,6 +47,8 @@ data class DevMenuState(
     val cacheBusy: Boolean = false,
     val cacheMessage: String = "",
     val audioQuality: com.veacon.veilmusic.data.AudioQuality = com.veacon.veilmusic.data.AudioQuality.DEFAULT,
+    /** Status and navigation bars shown instead of the immersive television window. */
+    val showSystemBars: Boolean = false,
     val logs:           List<LogEntry> = emptyList(),
 )
 
@@ -63,6 +65,7 @@ class DevMenuViewModel @Inject constructor(
     private val beatAnalyzer: BeatAnalyzer,
     private val lxPlayback: com.veacon.veilmusic.luoxue.LxPlayback,
     private val audioQualityPrefs: com.veacon.veilmusic.data.AudioQualityPreferences,
+    private val windowChromePrefs: com.veacon.veilmusic.data.WindowChromePreferences,
 ) : ViewModel() {
 
     data class UpdateState(val phase: String = "idle", val info: com.veacon.veilmusic.data.updates.UpdateInfo? = null,
@@ -113,6 +116,7 @@ class DevMenuViewModel @Inject constructor(
         beatLatencyMs  = beatAnalyzer.latencyMs,
         standaloneOn   = standalonePrefs.isEnabled(),
         audioQuality   = audioQualityPrefs.get(),
+        showSystemBars = windowChromePrefs.isShowingSystemBars(),
     ))
     val state: StateFlow<DevMenuState> = _state
 
@@ -133,6 +137,13 @@ class DevMenuViewModel @Inject constructor(
         }
         viewModelScope.launch {
             audioQualityPrefs.quality.collect { q -> _state.update { it.copy(audioQuality = q) } }
+        }
+        // The activity owns the window; this keeps the toggle's own row in sync
+        // when the value changes from somewhere else later on.
+        viewModelScope.launch {
+            windowChromePrefs.showSystemBars.collect { show ->
+                _state.update { it.copy(showSystemBars = show) }
+            }
         }
         refresh()
         viewModelScope.launch {
@@ -254,6 +265,16 @@ class DevMenuViewModel @Inject constructor(
         standalonePrefs.setEnabled(on)
         _state.update { it.copy(standaloneOn = on) }
         log("OK", tr(R.string.msg_065, if (on) tr(R.string.msg_066) else tr(R.string.msg_067)))
+    }
+
+    /**
+     * Persist the system-bar choice. MainActivity observes the same flow and
+     * restyles the live window, so the change is visible without a restart.
+     */
+    fun toggleSystemBars() {
+        val on = !windowChromePrefs.isShowingSystemBars()
+        windowChromePrefs.setShowSystemBars(on)
+        _state.update { it.copy(showSystemBars = on) }
     }
 
     /** Pre-formatted HTTP lines from the direct client's interceptor. */

@@ -8,14 +8,20 @@ import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import com.veacon.veilmusic.data.WindowChromePreferences
 import com.veacon.veilmusic.ui.AppShell
 import com.veacon.veilmusic.ui.viewmodel.MusicVideoViewModel
 import com.veacon.veilmusic.ui.viewmodel.NavigationViewModel
 import com.veacon.veilmusic.ui.viewmodel.PlayerViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var windowChromePrefs: WindowChromePreferences
 
     private val navVm: NavigationViewModel by viewModels()
     private val playerVmLazy = viewModels<PlayerViewModel>()
@@ -40,12 +46,18 @@ class MainActivity : ComponentActivity() {
         if (preferred != null) {
             window.attributes = window.attributes.apply { preferredDisplayModeId = preferred.modeId }
         }
-        applyImmersiveWindow()
+        // Load the saved appearance first: the bar colours below follow the theme.
+        com.veacon.veilmusic.ui.theme.AppPalette.load(applicationContext)
+        applyWindowChrome()
         if (Build.VERSION.SDK_INT >= 31) {
             val restored = setTranslucent(false)
             android.util.Log.i("BrandStartup", "Opaque runtime restored=$restored")
         }
-        com.veacon.veilmusic.ui.theme.AppPalette.load(applicationContext)
+        // The Appearance toggle writes the preference; the window belongs to the
+        // activity, so re-style it here instead of asking the user to restart.
+        lifecycleScope.launch {
+            windowChromePrefs.showSystemBars.collect { applyWindowChrome() }
+        }
         setContent {
             com.veacon.veilmusic.ui.components.LargeScreenGate(onAccessChanged = ::updateWindowAccess) {
                 com.veacon.veilmusic.ui.components.StartupHost { ready ->
@@ -68,7 +80,33 @@ class MainActivity : ComponentActivity() {
         app.startMainServices()
     }
 
-    private fun applyImmersiveWindow() {
+    /**
+     * Two window modes, chosen by the Appearance settings toggle.
+     *
+     * Immersive (default, the shipped television behaviour) hides both bars and
+     * draws edge to edge. The alternative keeps the bars and insets the content,
+     * which is what a phone or a touch panel needs: the notification shade stays
+     * reachable and the gesture handle stops sitting on top of the first row.
+     */
+    private fun applyWindowChrome() {
+        if (windowChromePrefs.isShowingSystemBars()) {
+            // The theme sets android:windowFullscreen, so the flag has to go too —
+            // the insets controller alone cannot bring the status bar back.
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
+            val light = !com.veacon.veilmusic.ui.theme.AppPalette.isDark
+            val barColor = if (light) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+            window.statusBarColor = barColor
+            window.navigationBarColor = barColor
+            androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+                systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+                show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                isAppearanceLightStatusBars = light
+                isAppearanceLightNavigationBars = light
+            }
+            return
+        }
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
@@ -83,7 +121,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) applyImmersiveWindow()
+        if (hasFocus) applyWindowChrome()
     }
 
     override fun onStop() {
