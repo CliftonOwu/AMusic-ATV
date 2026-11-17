@@ -197,6 +197,18 @@ fun DevMenuScreen(
                 state.cacheMessage, vm::setCacheCapacity, vm::clearCache)
             // 免登录后这里不再是「账号配置」，而是遥控器输入不便时的唯一入口：
             // 手机浏览器打开 :8080 可以导入歌单、改播放设置。
+            // 2.0 起登录被改成可选项，入口被一起删掉了；resetOnboarding() 仍在，
+            // 这里把它接回来：点开会走 OnboardingScreen（二维码 + 手机填令牌）。
+            SettingsSection(tx("Apple Music 账号", "Apple Music account")) {
+                ActionSettingRow(
+                    tx("登录 Apple Music", "Sign in to Apple Music"),
+                    if (state.hasMUT) {
+                        tx("已登录，点击可重新配置", "Signed in; select to reconfigure")
+                    } else {
+                        tx("扫码后在手机上粘贴用户令牌", "Scan the code, then paste your user token on the phone")
+                    },
+                ) { playerVm.resetOnboarding() }
+            }
             SettingsSection(tr(R.string.msg_218)) { PhoneServerRow(state.webServerUrl, playerVm) }
             SettingsSection(tx("关于", "About")) {
                 val details = when (update.phase) {
