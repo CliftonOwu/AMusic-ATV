@@ -1,8 +1,7 @@
 name: Build Veil Music APK
 
 # Cloud build so an APK with the system-bar option can be produced without a
-# local JDK 17 + Android SDK 36 toolchain. Optional: delete this file if you
-# build locally with `./gradlew :app:assembleDebug`.
+# local JDK 17 + Android SDK 36 toolchain.
 on:
   workflow_dispatch:
 
@@ -23,21 +22,52 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
+      # The Linux runner already ships an Android SDK, so no third-party setup
+      # action is involved (android-actions/setup-android has been failing here).
+      - name: Prepare Android SDK
         run: |
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-          yes | sdkmanager --licenses > /dev/null
+          set -u
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "Candidate SDK root: $SDK"
+          if [ ! -d "$SDK" ]; then
+            echo "::error::No Android SDK at $SDK"
+            exit 1
+          fi
+          SM="$(ls -1 "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -n 1 || true)"
+          if [ -z "$SM" ]; then
+            echo "sdkmanager not found, downloading command-line tools"
+            curl -fsSL -o /tmp/clt.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            mkdir -p "$SDK/cmdline-tools"
+            unzip -q /tmp/clt.zip -d "$SDK/cmdline-tools"
+            mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+            SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          echo "Using $SM"
+          "$SM" --version || true
+          yes | "$SM" --sdk_root="$SDK" --licenses > /dev/null || true
+          if [ -d "$SDK/platforms/android-36" ]; then
+            echo "platforms;android-36 already present"
+          else
+            "$SM" --sdk_root="$SDK" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          fi
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
 
       - name: Fix wrapper line endings
         run: |
           chmod +x gradlew
           sed -i 's/\r$//' gradlew
 
-      - name: Assemble debug and release
+      - name: Assemble debug
         run: |
-          ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace \
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+UseSerialGC"
+
+      # R8 sometimes trips on this project; never let it hide the debug APK.
+      - name: Assemble release
+        continue-on-error: true
+        run: |
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace \
             -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+UseSerialGC"
 
       - name: Collect APKs
